@@ -3,6 +3,7 @@
 import UIKit
 
 private let reuseIdentifier = "Item"
+private let columnReuseIdentifier = "ColumnItem"
 private let headerIdentifier = "Header"
 private let headerKind = "header"
 
@@ -26,17 +27,46 @@ class EmojiCollectionViewController: UICollectionViewController {
     ]
     
     var sections: [Section] = []
-    var layout: UICollectionViewLayout?
+    
+    enum Layout {
+        case grid
+        case column
+    }
+    
+    var activeLayout: Layout = .grid {
+        didSet {
+            if let layout = layout[activeLayout] {
+                self.collectionView.reloadItems(at:
+                   self.collectionView.indexPathsForVisibleItems)
+    
+                collectionView.setCollectionViewLayout(layout,
+                   animated: true) { (_) in
+                    switch self.activeLayout {
+                    case .grid:
+                        self.layoutButton.image = UIImage(systemName:
+                           "rectangle.grid.1x2")
+                    case .column:
+                        self.layoutButton.image = UIImage(systemName:
+                           "square.grid.2x2")
+                    }
+                }
+            }
+        }
+    }
+    
+    var layout: [Layout: UICollectionViewLayout] = [:]
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         collectionView.register(EmojiCollectionViewHeader.self,
-           forSupplementaryViewOfKind: headerKind, withReuseIdentifier:
-           headerIdentifier)
-        layout = generateGridLayout()
+                                forSupplementaryViewOfKind: headerKind, withReuseIdentifier:
+                                    headerIdentifier)
+       
+        layout[.grid]   = generateGridLayout()
+        layout[.column] = generateColumnLayout()
         
-        if let layout = layout {
+        if let layout = layout[activeLayout] {
             collectionView.collectionViewLayout = layout
         }
     }
@@ -45,6 +75,48 @@ class EmojiCollectionViewController: UICollectionViewController {
         super.viewWillAppear(animated)
         updateSections()
         collectionView.reloadData()
+    }
+    
+    func generateColumnLayout() -> UICollectionViewLayout {
+        let padding: CGFloat = 10
+    
+        let item = NSCollectionLayoutItem(
+            layoutSize: NSCollectionLayoutSize(
+                widthDimension: .fractionalWidth(1),
+                heightDimension: .fractionalHeight(1)
+            )
+        )
+    
+        let group = NSCollectionLayoutGroup.horizontal(
+            layoutSize: NSCollectionLayoutSize(
+                widthDimension: .fractionalWidth(1),
+                heightDimension: .absolute(120)
+        ),
+            subitem: item,
+            count: 1
+        )
+    
+        group.contentInsets = NSDirectionalEdgeInsets(
+            top: 0,
+            leading: padding,
+            bottom: 0,
+            trailing: padding
+        )
+    
+        let section = NSCollectionLayoutSection(group: group)
+    
+        section.interGroupSpacing = padding
+    
+        section.contentInsets = NSDirectionalEdgeInsets(
+            top: padding,
+            leading: 0,
+            bottom: padding,
+            trailing: 0
+        )
+    
+        section.boundarySupplementaryItems = [generateHeader()]
+    
+        return UICollectionViewCompositionalLayout(section: section)
     }
     
     func generateGridLayout() -> UICollectionViewLayout {
@@ -122,6 +194,12 @@ class EmojiCollectionViewController: UICollectionViewController {
     }
     
     @IBAction func switchLayouts(sender: UIBarButtonItem) {
+        switch activeLayout {
+        case .grid:
+            activeLayout = .column
+        case .column:
+            activeLayout = .grid
+        }
     }
 
     // MARK: - UICollectionViewDataSource
@@ -135,7 +213,11 @@ class EmojiCollectionViewController: UICollectionViewController {
     }
 
     override func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath) as! EmojiCollectionViewCell
+        
+        let identifier = activeLayout == .grid ? reuseIdentifier :
+           columnReuseIdentifier
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier:
+           identifier, for: indexPath) as! EmojiCollectionViewCell
     
         //Step 2: Fetch model object to display
         let emoji = sections[indexPath.section].emojis[indexPath.item]
